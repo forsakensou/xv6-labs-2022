@@ -114,6 +114,7 @@ sys_sysinfo(void)
   struct sysinfo info;
   info.freemem = freemem_amount();
   info.nproc = procnum();
+  printf("my student number is 20307130044\n");
   if(copyout(myproc()->pagetable, n, (char *)&info, sizeof(info)) < 0)
     return -1;
   return 0;
