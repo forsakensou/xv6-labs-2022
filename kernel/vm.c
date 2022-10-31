@@ -437,3 +437,20 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+void
+vmprint(pagetable_t pagetable, int level){
+  char *dots;
+  if (level == 2) dots = "..";
+  else if (level == 1) dots = ".. ..";
+  else dots = ".. .. ..";
+  for (int i = 0; i < 512; i++){ //every page has 512S
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V) { //valid page
+      uint64 child = PTE2PA(pte); //turn vitual to physical
+      printf("%s%d: pte %p pa %p\n", dots, i, pte, child);
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0) //have next page
+        vmprint((pagetable_t)child, level - 1);
+    }
+  }
+}
