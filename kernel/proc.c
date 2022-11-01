@@ -420,7 +420,7 @@ wait(uint64 addr)
     havekids = 0;
     for(pp = proc; pp < &proc[NPROC]; pp++){
       if(pp->parent == p){
-        // make sure the child isn't still in exit() or swtch().
+        // make sure the child isn't still in exit() or swztch().
         acquire(&pp->lock);
 
         havekids = 1;
@@ -713,4 +713,19 @@ procnum(void)
     num++;
   }
   return num;
+}
+
+uint64
+pgaccess(void *base, int len, void *mask)
+{
+  struct proc *p = myproc();
+  int result = 0;
+  for (int i = 0; i < len; i++){
+    pte_t *pte = walk(p->pagetable, ((uint64)base) + (uint64)PGSIZE * i, 0);
+    if(pte && ((*pte) & PTE_A)){
+      result |= (1 << i);
+      *pte &= (~PTE_A);
+    }
+  }
+  return copyout(p->pagetable, (uint64)mask, (char*)&result, sizeof(int));
 }
