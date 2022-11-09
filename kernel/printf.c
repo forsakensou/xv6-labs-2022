@@ -133,3 +133,16 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void)
+{
+  printf("backtrace:\n");
+  uint64 last_addr = r_fp();
+  while (PGROUNDUP(last_addr) - PGROUNDDOWN(last_addr) == PGSIZE)
+  {
+    uint64 ret_addr = *(uint64 *)(last_addr - 8);
+    printf("%p\n", ret_addr);
+    last_addr = *(uint64 *)(last_addr - 16);
+  }
+}
