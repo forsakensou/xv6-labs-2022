@@ -127,6 +127,8 @@ found:
   p->interval = 0;
   p->passed_interval = 0;
   p->handler = 0;
+  p->trap_cp = (struct trapframe *)kalloc();
+  p->alarm_signal = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -172,6 +174,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->alarm_signal = 0;
+  p->handler = 0;
+  p->interval = 0;
+  p->passed_interval = 0;
+  if (p->trap_cp)
+    kfree((void*)p->trap_cp);
 }
 
 // Create a user page table for a given process, with no user memory,

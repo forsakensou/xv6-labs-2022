@@ -108,5 +108,8 @@ sys_sigalarm(void)
 uint64
 sys_sigreturn(void)
 {
-  return 0;
+  memmove(myproc()->trapframe, myproc()->trap_cp, sizeof(struct trapframe));
+  myproc()->passed_interval = 0;
+  myproc()->alarm_signal = 0;
+  return myproc()->trap_cp->a0;
 }
