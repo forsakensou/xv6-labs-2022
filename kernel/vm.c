@@ -316,6 +316,8 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    *pte = (*pte) & (~PTE_W); //set PTE_W unwriteable
+    *pte = (*pte) | (PTE_C);  //set PTE_C true
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
       goto err;
@@ -324,6 +326,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       kfree(mem);
       goto err;
     }
+    
   }
   return 0;
 
