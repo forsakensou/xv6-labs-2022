@@ -322,13 +322,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     //if((mem = kalloc()) == 0)
     //  goto err;
     //memmove(mem, (char*)pa, PGSIZE);
-    if(krefinc(pa, 1) != 0)
-      goto err;
+    krefadd((void*)pa); //another reference instead of copy
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       //kfree(mem);
       goto err;
     }
-    
   }
   return 0;
 
@@ -348,6 +346,38 @@ uvmclear(pagetable_t pagetable, uint64 va)
   if(pte == 0)
     panic("uvmclear");
   *pte &= ~PTE_U;
+}
+
+
+int
+uvmcowalloc(pagetable_t pagetable, uint64 va) //if the page is cow page, apply for new physical page
+{
+  uint64 pa;
+  pte_t *pte;
+  uint flags;
+
+  if (va >= MAXVA) return -1;
+
+  va = PGROUNDDOWN(va);
+  pte = walk(pagetable, va, 0);
+  if (pte == 0) return -1;
+
+  pa = PTE2PA(*pte);
+  if (pa == 0) return -1;
+
+  flags = PTE_FLAGS(*pte);
+  if (flags & PTE_C){  
+    flags = (flags & ~PTE_C) | PTE_W;
+    char *ka = kalloc();
+    if (ka == 0) 
+      return -1;
+    memmove(ka, (char*)pa, PGSIZE);
+    kfree((void*)pa);
+    *pte = PA2PTE((uint64)ka) | flags;
+    return 0;
+  }
+  
+  return 0;
 }
 
 // Copy from kernel to user.
@@ -445,34 +475,4 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
-}
-
-int
-uvmcowalloc(pagetable_t pagetable, uint64 va)
-{
-  uint64 pa;
-  pte_t *pte;
-  uint flags;
-
-  if (va >= MAXVA) return -1;
-
-  va = PGROUNDDOWN(va);
-  pte = walk(pagetable, va, 0);
-  if (pte == 0) return -1;
-
-  pa = PTE2PA(*pte);
-  if (pa == 0) return -1;
-
-  flags = PTE_FLAGS(*pte);
-  if (flags & PTE_C){  
-    flags = (flags & ~PTE_C) | PTE_W;
-    char *ka = kalloc();
-    if (ka == 0) return -1;
-    memmove(ka, (char*)pa, PGSIZE);
-    kfree((void*)pa);
-    *pte = PA2PTE((uint64)ka) | flags;
-    return 0;
-  }
-  
-  return 0;
 }

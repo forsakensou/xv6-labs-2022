@@ -8,6 +8,7 @@
 #include "spinlock.h"
 #include "riscv.h"
 #include "defs.h"
+#define PA2INDEX(pa) ((uint64)pa>>12)
 
 void freerange(void *pa_start, void *pa_end);
 
@@ -21,6 +22,7 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  uint16 refcount[PA2INDEX(PHYSTOP)];
 } kmem;
 
 void
@@ -28,6 +30,31 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  memset(kmem.refcount, 0, sizeof(kmem.refcount));
+}
+
+
+uint32 
+krefcount(void *pa){
+ uint32 ret = 0;
+ acquire(&kmem.lock);
+ ret = kmem.refcount[PA2INDEX(pa)];
+ release(&kmem.lock);
+ return ret;
+}
+
+void 
+krefadd(void *pa){
+ acquire(&kmem.lock);
+ kmem.refcount[PA2INDEX(pa)]++;
+ release(&kmem.lock);
+}
+
+void 
+krefminus(void *pa){
+ acquire(&kmem.lock);
+ kmem.refcount[PA2INDEX(pa)]--;
+ release(&kmem.lock);
 }
 
 void
@@ -50,6 +77,13 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+
+  // if the page's refcount is zero, then the page can be released
+  if(krefcount(pa) > 0){
+  	krefminus(pa);	 
+	  if(krefcount(pa) > 0) //not zero, don't release
+  	 	return;
+  }
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -76,7 +110,10 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
+    krefadd((void *)r);
+  }
   return (void*)r;
 }
+
