@@ -308,7 +308,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -319,11 +319,13 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     *pte = (*pte) & (~PTE_W); //set PTE_W unwriteable
     *pte = (*pte) | (PTE_C);  //set PTE_C true
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
+    //if((mem = kalloc()) == 0)
+    //  goto err;
+    //memmove(mem, (char*)pa, PGSIZE);
+    if(krefinc(pa, 1) != 0)
       goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      //kfree(mem);
       goto err;
     }
     
@@ -358,6 +360,10 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    if (uvmcowalloc(pagetable, va0) != 0)
+      return -1;
+
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
@@ -439,4 +445,34 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+int
+uvmcowalloc(pagetable_t pagetable, uint64 va)
+{
+  uint64 pa;
+  pte_t *pte;
+  uint flags;
+
+  if (va >= MAXVA) return -1;
+
+  va = PGROUNDDOWN(va);
+  pte = walk(pagetable, va, 0);
+  if (pte == 0) return -1;
+
+  pa = PTE2PA(*pte);
+  if (pa == 0) return -1;
+
+  flags = PTE_FLAGS(*pte);
+  if (flags & PTE_C){  
+    flags = (flags & ~PTE_C) | PTE_W;
+    char *ka = kalloc();
+    if (ka == 0) return -1;
+    memmove(ka, (char*)pa, PGSIZE);
+    kfree((void*)pa);
+    *pte = PA2PTE((uint64)ka) | flags;
+    return 0;
+  }
+  
+  return 0;
 }
