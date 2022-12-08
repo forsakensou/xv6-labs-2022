@@ -341,7 +341,7 @@ sys_open(void)
     return -1;
   }
 
-  if(ip->type == T_SYMLINK && ((omode & O_NOFOLLOW) == 0)){
+  if(ip->type == T_SYMLINK && ((omode & O_NOFOLLOW) == 0)){ // when the inode->type is Symobolic link and O_NOFOLLOW sign do not work
     int cycle_times = 0;
     char target[MAXPATH];
     while(ip->type == T_SYMLINK)
@@ -539,12 +539,12 @@ sys_symlink(void)
   argstr(0, target, MAXPATH);
   argstr(1, path, MAXPATH);
   begin_op();
-  if((ip = create(path, T_SYMLINK, 0, 0)) == 0)
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0) //create will lock
   {
     end_op();
     return -1;
   }
-  if(writei(ip, 0, (uint64)target, 0, MAXPATH) != MAXPATH)
+  if(writei(ip, 0, (uint64)target, 0, MAXPATH) != MAXPATH) //writei need the inode be locked
   {
     iunlockput(ip);
     end_op();
